@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Booking App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-800 shadow-sm">
+            <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-blue-600 dark:text-blue-400">Slot Booking</h1>
+                <div class="flex items-center gap-4">
+                    <select id="timezone" class="rounded-md border-gray-300 dark:bg-gray-700 dark:text-white px-3 py-2">
+                        <!-- Timezones will be populated by JavaScript -->
+                    </select>
+                    <button id="themeToggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i class="bi bi-moon-stars dark:text-white"></i>
+                    </button>
+                </div>
+            </nav>
+        </header>
+
+        <!-- Main Content -->
+        <main class="container mx-auto px-4 py-8">
+            <!-- User Profile Section -->
+            <div class="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold dark:text-white">Your Profile</h2>
+                    <button id="editProfile" class="text-blue-600 dark:text-blue-400 hover:underline">
+                        Edit Profile
+                    </button>
+                </div>
+                <div id="profileInfo" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="dark:text-white">
+                        <p class="font-medium">Username:</p>
+                        <p id="username">user123</p>
+                    </div>
+                    <div class="dark:text-white">
+                        <p class="font-medium">Email:</p>
+                        <p id="email">user@example.com</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Availability Section -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-semibold dark:text-white">Manage Availability</h2>
+                    <div class="flex gap-2">
+                        <button id="copyDay" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 dark:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">
+                            Copy Day
+                        </button>
+                        <button id="addSlot" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                            Add Slot
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Calendar View -->
+                <div class="mb-6">
+                    <div id="calendar" class="grid grid-cols-7 gap-2 text-center">
+                        <!-- Calendar will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Time Slots -->
+                <div id="timeSlots" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Time slots will be populated by JavaScript -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for adding/editing slots -->
+    <div id="slotModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4 dark:text-white">Add Time Slot</h3>
+            <form id="slotForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium dark:text-white">Date</label>
+                    <input type="date" id="slotDate" class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-700 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium dark:text-white">Start Time</label>
+                    <input type="time" id="startTime" class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-700 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium dark:text-white">End Time</label>
+                    <input type="time" id="endTime" class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-700 dark:text-white">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" id="cancelSlot" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 dark:text-white rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Initialize DateTime
+        const DateTime = luxon.DateTime;
+
+        // State management
+        const state = {
+            slots: [],
+            selectedDate: DateTime.now(),
+            darkMode: false
+        };
+
+        // DOM Elements
+        const themeToggle = document.getElementById('themeToggle');
+        const slotModal = document.getElementById('slotModal');
+        const addSlotBtn = document.getElementById('addSlot');
+        const cancelSlotBtn = document.getElementById('cancelSlot');
+        const slotForm = document.getElementById('slotForm');
+        const timezoneSelect = document.getElementById('timezone');
+
+        // Initialize timezones
+        function initializeTimezones() {
+            const timezones = Intl.supportedValuesOf('timeZone');
+            timezones.forEach(zone => {
+                const option = document.createElement('option');
+                option.value = zone;
+                option.textContent = zone;
+                if (zone === Intl.DateTimeFormat().resolvedOptions().timeZone) {
+                    option.selected = true;
+                }
+                timezoneSelect.appendChild(option);
+            });
+        }
+
+        // Calendar functions
+        function renderCalendar() {
+            const calendar = document.getElementById('calendar');
+            calendar.innerHTML = '';
+
+            // Add day headers
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            days.forEach(day => {
+                const dayEl = document.createElement('div');
+                dayEl.className = 'font-medium dark:text-white';
+                dayEl.textContent = day;
+                calendar.appendChild(dayEl);
+            });
+
+            // Add dates
+            const start = state.selectedDate.startOf('month').startOf('week');
+            const end = state.selectedDate.endOf('month').endOf('week');
+            let current = start;
+
+            while (current <= end) {
+                const dateEl = document.createElement('div');
+                dateEl.className = `p-2 cursor-pointer rounded-full hover:bg-gray-100 dark:hover:bg-gray-700
+                    ${current.hasSame(DateTime.now(), 'day') ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
+                    ${current.month === state.selectedDate.month ? 'dark:text-white' : 'text-gray-400 dark:text-gray-500'}`;
+                dateEl.textContent = current.day;
+                dateEl.addEventListener('click', () => selectDate(current));
+                calendar.appendChild(dateEl);
+                current = current.plus({ days: 1 });
+            }
+        }
+
+        function selectDate(date) {
+            state.selectedDate = date;
+            renderCalendar();
+            renderTimeSlots();
+        }
+
+        // Slot management
+        function renderTimeSlots() {
+            const slotsContainer = document.getElementById('timeSlots');
+            slotsContainer.innerHTML = '';
+
+            const daySlots = state.slots.filter(slot => 
+                DateTime.fromISO(slot.date).hasSame(state.selectedDate, 'day')
+            );
+
+            daySlots.forEach(slot => {
+                const slotEl = document.createElement('div');
+                slotEl.className = 'bg-gray-100 dark:bg-gray-700 p-4 rounded-lg';
+                slotEl.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="dark:text-white">${slot.startTime} - ${slot.endTime}</span>
+                        <button class="text-red-600 hover:text-red-700" onclick="deleteSlot('${slot.id}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `;
+                slotsContainer.appendChild(slotEl);
+            });
+        }
+
+        function addSlot(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const slot = {
+                id: Date.now().toString(),
+                date: formData.get('slotDate'),
+                startTime: formData.get('startTime'),
+                endTime: formData.get('endTime')
+            };
+
+            state.slots.push(slot);
+            closeModal();
+            renderTimeSlots();
+        }
+
+        function deleteSlot(id) {
+            state.slots = state.slots.filter(slot => slot.id !== id);
+            renderTimeSlots();
+        }
+
+        // Modal functions
+        function openModal() {
+            slotModal.classList.remove('hidden');
+            slotModal.classList.add('flex');
+        }
+
+        function closeModal() {
+            slotModal.classList.add('hidden');
+            slotModal.classList.remove('flex');
+            slotForm.reset();
+        }
+
+        // Theme toggle
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            state.darkMode = !state.darkMode;
+            themeToggle.innerHTML = state.darkMode ? 
+                '<i class="bi bi-sun text-white"></i>' : 
+                '<i class="bi bi-moon-stars"></i>';
+        }
+
+        // Event listeners
+        themeToggle.addEventListener('click', toggleTheme);
+        addSlotBtn.addEventListener('click', openModal);
+        cancelSlotBtn.addEventListener('click', closeModal);
+        slotForm.addEventListener('submit', addSlot);
+        timezoneSelect.addEventListener('change', (e) => {
+            // Handle timezone change
+            console.log('Timezone changed to:', e.target.value);
+        });
+
+        // Initialize
+        initializeTimezones();
+        renderCalendar();
+        renderTimeSlots();
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
